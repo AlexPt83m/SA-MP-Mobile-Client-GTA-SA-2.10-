@@ -1,0 +1,74 @@
+name: Testar SA-MP Mobile
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar source
+        uses: actions/checkout@v4
+
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Configurar Android
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar SDK e NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.0.13004108" \
+            "cmake;3.22.1"
+
+      - name: Dar permissão ao Gradle
+        run: chmod +x gradlew
+
+      - name: Firebase temporário para teste
+        run: |
+          cat > app/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "samp-test"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.russia.game.test"
+                  }
+                },
+                "api_key": [
+                  {
+                    "current_key": "TEST_KEY"
+                  }
+                ]
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
+      - name: Compilar APK teste
+        run: ./gradlew :app:assembleVer_testDebug --stacktrace
+
+      - name: Salvar APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA-MP-Mobile-Test
+          path: app/build/outputs/apk/**/*.apk
